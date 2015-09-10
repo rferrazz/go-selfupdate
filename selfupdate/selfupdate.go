@@ -43,8 +43,8 @@ import (
 	"time"
 
 	"github.com/kardianos/osext"
-	"gopkg.in/inconshreveable/go-update.v0"
 	"github.com/kr/binarydist"
+	"gopkg.in/inconshreveable/go-update.v0"
 )
 
 const (
@@ -88,6 +88,9 @@ type Updater struct {
 }
 
 func (u *Updater) getExecRelativeDir(dir string) string {
+	if dir[0] == '/' {
+		return dir
+	}
 	filename, _ := osext.Executable()
 	path := filepath.Join(filepath.Dir(filename), dir)
 	return path
