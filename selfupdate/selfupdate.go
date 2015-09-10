@@ -99,25 +99,24 @@ func (u *Updater) getExecRelativeDir(dir string) string {
 // BackgroundRun starts the update check and apply cycle.
 func (u *Updater) BackgroundRun() error {
 	os.MkdirAll(u.getExecRelativeDir(u.Dir), 0777)
-	if u.wantUpdate() {
-		if err := up.CanUpdate(); err != nil {
-			// fail
-			return err
-		}
-		//self, err := osext.Executable()
-		//if err != nil {
-		// fail update, couldn't figure out path to self
-		//return
-		//}
-		// TODO(bgentry): logger isn't on Windows. Replace w/ proper error reports.
-		if err := u.update(); err != nil {
-			return err
-		}
+	if err := up.CanUpdate(); err != nil {
+		// fail
+		return err
+	}
+	//self, err := osext.Executable()
+	//if err != nil {
+	// fail update, couldn't figure out path to self
+	//return
+	//}
+	// TODO(bgentry): logger isn't on Windows. Replace w/ proper error reports.
+	if err := u.update(); err != nil {
+		return err
 	}
 	return nil
 }
 
-func (u *Updater) wantUpdate() bool {
+func (u *Updater) WantUpdate() bool {
+	os.MkdirAll(u.getExecRelativeDir(u.Dir), 0777)
 	path := u.getExecRelativeDir(u.Dir + upcktimePath)
 	if u.CurrentVersion == "dev" || readTime(path).After(time.Now()) {
 		return false
@@ -144,22 +143,24 @@ func (u *Updater) update() error {
 	if u.Info.Version == u.CurrentVersion {
 		return nil
 	}
+	log.Println("update: fetching binary patch")
 	bin, err := u.fetchAndVerifyPatch(old)
 	if err != nil {
 		if err == ErrHashMismatch {
 			log.Println("update: hash mismatch from patched binary")
 		} else {
 			if u.DiffURL != "" {
-				log.Println("update: patching binary,", err)
+				log.Println("update: error while patching binary,", err)
 			}
 		}
 
+		log.Println("update: fetching full binary")
 		bin, err = u.fetchAndVerifyFullBin()
 		if err != nil {
 			if err == ErrHashMismatch {
 				log.Println("update: hash mismatch from full binary")
 			} else {
-				log.Println("update: fetching full binary,", err)
+				log.Println("update: error while fetching full binary,", err)
 			}
 			return err
 		}
