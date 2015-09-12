@@ -112,6 +112,8 @@ func createUpdate(path string, platform string) {
 			os.Exit(1)
 		}
 
+		fmt.Printf("Generating delta: %s, %s->%s\n", platform, file.Name(), version)
+
 		ar := newGzReader(old)
 		defer ar.Close()
 		br := newGzReader(newF)
