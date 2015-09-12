@@ -12,6 +12,8 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
+	"time"
 
 	"github.com/kr/binarydist"
 )
@@ -59,7 +61,18 @@ func newGzReader(r io.ReadCloser) io.ReadCloser {
 	return g
 }
 
-func createUpdate(path string, platform string) {
+type oldRelease struct {
+	dir   os.FileInfo
+	mtime time.Time
+}
+
+type oldReleasesByTime []oldRelease
+
+func (d oldReleasesByTime) Len() int           { return len(d) }
+func (d oldReleasesByTime) Less(i, j int) bool { return d[i].mtime.Before(d[j].mtime) }
+func (d oldReleasesByTime) Swap(i, j int)      { d[i], d[j] = d[j], d[i] }
+
+func createUpdate(path string, platform string, numDiffs int) {
 	c := current{Version: version, Sha256: generateSha256(path)}
 
 	b, err := json.MarshalIndent(c, "", "    ")
@@ -88,17 +101,30 @@ func createUpdate(path string, platform string) {
 		fmt.Println(err)
 	}
 
+	// Build a list of old releases available for this platform, using the
+	// full release file as timestamp of the release
+	var releases oldReleasesByTime
 	for _, file := range files {
-		if file.IsDir() == false {
-			continue
+		if file.IsDir() && file.Name() != version {
+			f, err := os.Stat(filepath.Join(genDir, file.Name(), platform+".gz"))
+			if err == nil {
+				releases = append(releases, oldRelease{
+					dir:   file,
+					mtime: f.ModTime(),
+				})
+			}
 		}
-		if file.Name() == version {
-			continue
-		}
+	}
+	sort.Sort(releases)
+	if numDiffs >= 0 {
+		releases = releases[len(releases)-numDiffs:]
+	}
 
-		os.Mkdir(filepath.Join(genDir, file.Name(), version), 0755)
+	for _, rel := range releases {
+		name := rel.dir.Name()
+		os.Mkdir(filepath.Join(genDir, name, version), 0755)
 
-		fName := filepath.Join(genDir, file.Name(), platform+".gz")
+		fName := filepath.Join(genDir, name, platform+".gz")
 		old, err := os.Open(fName)
 		if err != nil {
 			// Don't have an old release for this os/arch, continue on
@@ -112,7 +138,7 @@ func createUpdate(path string, platform string) {
 			os.Exit(1)
 		}
 
-		fmt.Printf("Generating delta: %s, %s->%s\n", platform, file.Name(), version)
+		fmt.Printf("Generating delta: %s, %s->%s\n", platform, name, version)
 
 		ar := newGzReader(old)
 		defer ar.Close()
@@ -122,7 +148,7 @@ func createUpdate(path string, platform string) {
 		if err := binarydist.Diff(ar, br, patch); err != nil {
 			panic(err)
 		}
-		ioutil.WriteFile(filepath.Join(genDir, file.Name(), version, platform), patch.Bytes(), 0755)
+		ioutil.WriteFile(filepath.Join(genDir, name, version, platform), patch.Bytes(), 0755)
 	}
 }
 
@@ -139,6 +165,7 @@ func createBuildDir() {
 
 func main() {
 	outputDirFlag := flag.String("o", "public", "Output directory for writing updates")
+	numDiffs := flag.Int("d", -1, "number of old versions to use for diffs (-1 = all versions)")
 
 	var defaultPlatform string
 	goos := os.Getenv("GOOS")
@@ -175,11 +202,11 @@ func main() {
 		files, err := ioutil.ReadDir(appPath)
 		if err == nil {
 			for _, file := range files {
-				createUpdate(filepath.Join(appPath, file.Name()), file.Name())
+				createUpdate(filepath.Join(appPath, file.Name()), file.Name(), *numDiffs)
 			}
 			os.Exit(0)
 		}
 	}
 
-	createUpdate(appPath, platform)
+	createUpdate(appPath, platform, *numDiffs)
 }
