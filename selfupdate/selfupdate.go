@@ -118,11 +118,12 @@ func (u *Updater) BackgroundRun() error {
 func (u *Updater) WantUpdate() bool {
 	os.MkdirAll(u.getExecRelativeDir(u.Dir), 0777)
 	path := u.getExecRelativeDir(u.Dir + upcktimePath)
-	if u.CurrentVersion == "dev" || readTime(path).After(time.Now()) {
+	if readTime(path).After(time.Now()) {
 		return false
 	}
 	wait := 24*time.Hour + randDuration(24*time.Hour)
-	return writeTime(path, time.Now().Add(wait))
+	writeTime(path, time.Now().Add(wait))
+	return true
 }
 
 func (u *Updater) update() error {
@@ -141,6 +142,7 @@ func (u *Updater) update() error {
 		return err
 	}
 	if u.Info.Version == u.CurrentVersion {
+		log.Println("update: no new version available")
 		return nil
 	}
 	log.Println("update: fetching binary patch")
@@ -177,6 +179,7 @@ func (u *Updater) update() error {
 	if err != nil {
 		return err
 	}
+	log.Println("update: software updated correctly")
 	return nil
 }
 
@@ -265,18 +268,11 @@ func fetch(url string) (io.ReadCloser, error) {
 }
 
 func readTime(path string) time.Time {
-	p, err := ioutil.ReadFile(path)
-	if os.IsNotExist(err) {
+	fi, err := os.Stat(path)
+	if err != nil {
 		return time.Time{}
 	}
-	if err != nil {
-		return time.Now().Add(1000 * time.Hour)
-	}
-	t, err := time.Parse(time.RFC3339, string(p))
-	if err != nil {
-		return time.Now().Add(1000 * time.Hour)
-	}
-	return t
+	return fi.ModTime()
 }
 
 func verifySha(bin []byte, sha []byte) bool {
@@ -285,6 +281,10 @@ func verifySha(bin []byte, sha []byte) bool {
 	return bytes.Equal(h.Sum(nil), sha)
 }
 
-func writeTime(path string, t time.Time) bool {
-	return ioutil.WriteFile(path, []byte(t.Format(time.RFC3339)), 0644) == nil
+func writeTime(path string, t time.Time) {
+	err := os.Chtimes(path, t, t)
+	if os.IsNotExist(err) {
+		ioutil.WriteFile(path, nil, 0666)
+		os.Chtimes(path, t, t)
+	}
 }
