@@ -33,9 +33,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
-	"math/rand"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -113,17 +111,6 @@ func (u *Updater) BackgroundRun() error {
 		return err
 	}
 	return nil
-}
-
-func (u *Updater) WantUpdate() bool {
-	os.MkdirAll(u.getExecRelativeDir(u.Dir), 0777)
-	path := u.getExecRelativeDir(u.Dir + upcktimePath)
-	if readTime(path).After(time.Now()) {
-		return false
-	}
-	wait := 24*time.Hour + randDuration(24*time.Hour)
-	writeTime(path, time.Now().Add(wait))
-	return true
 }
 
 func (u *Updater) update() error {
@@ -252,11 +239,6 @@ func (u *Updater) fetchBin() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// returns a random duration in [0,n).
-func randDuration(n time.Duration) time.Duration {
-	return time.Duration(rand.Int63n(int64(n)))
-}
-
 func fetch(url string) (io.ReadCloser, error) {
 	resp, err := http.Get(url)
 	if err != nil {
@@ -268,24 +250,8 @@ func fetch(url string) (io.ReadCloser, error) {
 	return resp.Body, nil
 }
 
-func readTime(path string) time.Time {
-	fi, err := os.Stat(path)
-	if err != nil {
-		return time.Time{}
-	}
-	return fi.ModTime()
-}
-
 func verifySha(bin []byte, sha []byte) bool {
 	h := sha256.New()
 	h.Write(bin)
 	return bytes.Equal(h.Sum(nil), sha)
-}
-
-func writeTime(path string, t time.Time) {
-	err := os.Chtimes(path, t, t)
-	if os.IsNotExist(err) {
-		ioutil.WriteFile(path, nil, 0666)
-		os.Chtimes(path, t, t)
-	}
 }
