@@ -40,7 +40,6 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/kardianos/osext"
 	"github.com/kr/binarydist"
 	"gopkg.in/inconshreveable/go-update.v0"
 )
@@ -89,7 +88,7 @@ func (u *Updater) getExecRelativeDir(dir string) string {
 	if dir[0] == '/' {
 		return dir
 	}
-	filename, _ := osext.Executable()
+	filename, _ := os.Executable()
 	path := filepath.Join(filepath.Dir(filename), dir)
 	return path
 }
@@ -114,7 +113,7 @@ func (u *Updater) BackgroundRun() error {
 }
 
 func (u *Updater) update() error {
-	path, err := osext.Executable()
+	path, err := os.Executable()
 	if err != nil {
 		return err
 	}
