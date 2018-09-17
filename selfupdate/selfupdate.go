@@ -40,7 +40,7 @@ import (
 	"runtime"
 	"time"
 
-	update "github.com/inconshreveable/go-update@v0"
+	update "github.com/inconshreveable/go-update"
 	"github.com/kr/binarydist"
 )
 
