@@ -40,8 +40,8 @@ import (
 	"runtime"
 	"time"
 
+	update "github.com/inconshreveable/go-update@v0"
 	"github.com/kr/binarydist"
-	"gopkg.in/inconshreveable/go-update.v0"
 )
 
 const (
